@@ -1,8 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import os, sys
-from utils import get_df
+import os
 import seaborn as sns
+import sys
+sys.path.append('..')
+from utils import get_df
 
 if __name__ == '__main__':
 	df = get_df()

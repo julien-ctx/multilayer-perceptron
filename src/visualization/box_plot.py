@@ -1,6 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import os, sys
+import os
+import sys
+sys.path.append('..')
 from utils import get_df
 
 if __name__ == '__main__':
