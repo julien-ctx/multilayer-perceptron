@@ -5,6 +5,7 @@ from scipy.stats import ks_2samp
 class MultilayerPerceptron:
 	def __init__(self, df):
 		self.sample = df
+		self.alpha = 0.001
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -20,7 +21,10 @@ class MultilayerPerceptron:
 				sample = sample.drop(feature, axis=1)
 				
 		self.sample = sample
- 
+
+	def add_bias(self):
+		self.sample['Bias'] = np.ones(self.sample.shape[0])
+
 	def standardize(self):
 		self.sample = self.sample.apply(lambda x : (x - np.mean(x)) / np.std(x))
 
