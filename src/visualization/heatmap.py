@@ -12,7 +12,7 @@ if __name__ == '__main__':
 	# -1 indicates strong negative correlation
 	# 1 indicates strong positive correlation
 	# 0 indicates no correlation
-	corr = df.corr()
+	corr = df.corr(numeric_only=True)
 
 	sns.heatmap(corr, cmap='coolwarm')
 

@@ -13,3 +13,4 @@ if __name__ == '__main__':
 	# Features engineering
 	model.drop_irrelevant_data()
 	model.standardize()
+	print(model.sample)

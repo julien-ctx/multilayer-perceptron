@@ -13,8 +13,8 @@ if __name__ == '__main__':
 	boxprops = dict(linewidth=1.5, color='r')
 	whiskerprops = dict(linewidth=1.5, color='b')
 
-	for i, feature in enumerate(df.drop('Malignant', axis=1).columns):
-		axs[i // 4][i % 4].boxplot([df[df.Malignant != 0][feature], df[df.Malignant != 1][feature]], boxprops=boxprops, whiskerprops=whiskerprops)
+	for i, feature in enumerate(df.drop('Diagnosis', axis=1).columns):
+		axs[i // 4][i % 4].boxplot([df[df.Diagnosis != 0][feature], df[df.Diagnosis != 1][feature]], boxprops=boxprops, whiskerprops=whiskerprops)
 		axs[i // 4][i % 4].set_title(feature, fontsize=10)
 
 	plt.subplots_adjust(hspace=1, wspace=0.3)
