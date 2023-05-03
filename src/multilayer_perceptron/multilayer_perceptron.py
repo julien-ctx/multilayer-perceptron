@@ -2,6 +2,12 @@ import pandas as pd
 import numpy as np
 from scipy.stats import ks_2samp
 
+# A few interesting theories to determine the number of neurons in every hidden layer:
+# The number of hidden neurons should be between the size of the input layer and the size of the output layer.
+# The number of hidden neurons should be 2/3 the size of the input layer, plus the size of the output layer.
+# The number of hidden neurons should be less than twice the size of the input layer.
+# For this project, let use the mean of number of neurons in input layer, and number of neurons in output layer.
+
 class MultilayerPerceptron:
 	def __init__(self, df):
 		self.sample = df
