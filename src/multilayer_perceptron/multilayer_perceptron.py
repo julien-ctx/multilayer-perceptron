@@ -27,6 +27,10 @@ class MultilayerPerceptron:
 				sample = sample.drop(feature, axis=1)
 				
 		self.sample = sample
+  
+		# Separate the diagnosis from the input layer.
+		self.diagnosis = self.sample.Diagnosis.to_numpy().reshape(-1, 1)
+		self.sample = self.sample.drop('Diagnosis', axis=1)
 
 	def add_bias(self):
 		self.sample['Bias'] = np.ones(self.sample.shape[0])
@@ -34,6 +38,19 @@ class MultilayerPerceptron:
 	def standardize(self):
 		self.sample = self.sample.apply(lambda x : (x - np.mean(x)) / np.std(x))
 
+	def fit(self):
+		self.hidden_size = (self.sample.shape[1] + 2) // 2
+
+		# Gives a seed to numpy to understand that random values will always be the same after running the program several times.
+		np.random.seed(42)
+		# https://github.com/christianversloot/machine-learning-articles/blob/main/he-xavier-initialization-activation-functions-choose-wisely.md
+		# https://cs230.stanford.edu/section/4/
+		self.weights = [
+			np.random.randn(self.sample.shape[1], self.hidden_size),
+			np.random.randn(self.hidden_size, self.hidden_size),
+			np.random.randn(self.hidden_size, 2)
+		]
+		
 	def softmax(self, z):
 		# z are the logits of the neural network, ie the raw output before activation.
 		exp = np.exp(z)

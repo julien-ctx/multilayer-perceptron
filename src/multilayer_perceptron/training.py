@@ -16,3 +16,5 @@ if __name__ == '__main__':
 	model.drop_irrelevant_data()
 	model.standardize()
 	model.add_bias()
+	
+	model.fit()
