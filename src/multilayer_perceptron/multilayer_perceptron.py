@@ -13,6 +13,7 @@ class MultilayerPerceptron:
 	def __init__(self, df):
 		self.sample = df
 		self.alpha = 0.001
+		self.epochs = 1000
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -50,8 +51,19 @@ class MultilayerPerceptron:
 			activations.append(self.ReLU(activations[i] @ self.weights[i]))
 		# Add the output layer activations (without bias this time)
 		activations.append(self.softmax((activations[2] @ self.weights[2]).to_numpy()))
-		print(activations[-1])
-		exit()
+		return activations
+		
+	def print_loss(self, i, epoch, y_true, training_diagnosis):
+		pass
+		# self.training_loss(activations[-1], training)
+		# print(f"Fold {i + 1}/10 - Epoch {epoch}/{self.epochs} - Loss {self.training_loss(activations, training)} - Validation Loss {self.loss(activations, validation)}")
+
+	def get_gradient(self, y_true, y_pred):
+		# https://stats.stackexchange.com/questions/370723/how-to-calculate-the-derivative-of-crossentropy-error-function
+		# Gradient is different from logistic regression because the cross entropy loss function is not the same.
+		# Add epsilon to avoid division by zero
+		epsilon = 1e-8
+		return -y_true / (y_pred + epsilon) + (1 - y_true) / (1 - y_pred + epsilon)
   
 	def fit(self):
 		self.hidden_size = (self.sample.shape[1] + 2) // 2 + 1 # + 1 for bias
@@ -69,12 +81,22 @@ class MultilayerPerceptron:
 		# Generate folds to follow the subject guidelines.
 		kf = KFold(n_splits=10)
 		# training_i and validation_i are indices for data in self.sample for each fold.
-		for training_i, validation_i in kf.split(self.sample):
+		for i, (training_i, validation_i) in enumerate(kf.split(self.sample)):
+			weights = self.weights
 			training = self.sample.iloc[training_i, :]
 			validation = self.sample.iloc[validation_i, :]
-			for epoch in range(1000):
+			training_diagnosis = self.diagnosis[training_i, :]
+			training_validation = self.diagnosis[validation_i, :]
+			for epoch in range(self.epochs):
 				activations = self.get_activations(training)
-				# self.weights -= self.alpha * get_gradient()
+				# self.print_loss(i, epoch, activations[-1], training_diagnosis)
+				# np.where is need to one hot encode the true output. Because we have 2 neurons in the output layer, we need to transform the true values in 2 columns too.
+				# NEED TO DO BACKPROPAGATION HERE
+				weights -= self.alpha * self.get_gradient(np.where(training_diagnosis > 0, np.array([1, 0]), np.array([0, 1])), activations[-1])
+				exit()
+
+	def training_loss(self, y_pred, y_true):
+		return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
 	
 	# Softmax is used by neurons of output layer.
 	def softmax(self, z):
