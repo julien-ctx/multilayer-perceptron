@@ -61,14 +61,11 @@ class MultilayerPerceptron:
 		return -y_true / (y_pred + epsilon) + (1 - y_true) / (1 - y_pred + epsilon)
 
 	def backpropagation(self, y_true, activations, weights):
-		output_gradient = self.get_gradient(y_true, activations[-1])
-		softmax_derivative = self.softmax_derivative(activations[-1])
+		output_delta = self.get_gradient(y_true, activations[-1]) * self.softmax_derivative(activations[-1])
+		second_hidden_layer_delta =  (output_delta @ weights[2].T) * self.ReLU_derivative(activations[-2])
+		third_hidden_layer_delta = second_hidden_layer_delta @ weights[1].T  * self.ReLU_derivative(activations[-3])
 		exit()
-		# for i in range(len(weights) - 1):
-		# 	grads.append(grads[i] @ self.get_gradient(y_true, activations[-(len(weights) + i - 1)]))
-		# print(grads.length)
-		# exit()
-  
+	
 	def print_loss(self, i, epoch, y_true, training_diagnosis):
 		pass
 		# self.training_loss(activations[-1], training)
@@ -98,15 +95,13 @@ class MultilayerPerceptron:
 			training_validation = self.diagnosis[validation_i, :]
 			y_true = np.where(training_diagnosis > 0, np.array([1.0, 0.0]), np.array([0.0, 1.0]))
 			for epoch in range(self.epochs):
+				# Getting activations is computing the output of each layer using feedforward technique.
 				activations = self.get_activations(training)
 				# self.print_loss(i, epoch, activations[-1], training_diagnosis)
 				# np.where is need to one hot encode the true output. Because we have 2 neurons in the output layer, we need to transform the true values in 2 columns too.
 				grads = self.backpropagation(y_true, activations, weights)
 				exit()
 
-	# https://deepnotes.io/softmax-crossentropy
-	def softmax_derivative(self, activations):
-		return activations * (1 - activations)
 
 	def training_loss(self, y_pred, y_true):
 		return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
@@ -121,3 +116,10 @@ class MultilayerPerceptron:
 	# It is used by neurons of hidden layers.
 	def ReLU(self, z):
 		return np.maximum(0, z)
+
+	# https://deepnotes.io/softmax-crossentropy
+	def softmax_derivative(self, activations):
+		return activations * (1 - activations)
+
+	def ReLU_derivative(self, activations):
+		return (activations > 0) * 1
