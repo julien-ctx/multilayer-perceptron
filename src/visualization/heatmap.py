@@ -17,4 +17,5 @@ if __name__ == '__main__':
 	sns.heatmap(corr, cmap='coolwarm')
 
 	plt.get_current_fig_manager().set_window_title('Features correlation')
-	plt.show()
+	
+	plt.savefig('../../assets/heatmap.png')

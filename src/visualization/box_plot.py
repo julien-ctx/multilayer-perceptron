@@ -19,7 +19,8 @@ if __name__ == '__main__':
 
 	plt.subplots_adjust(hspace=1, wspace=0.3)
 	axs[7, 3].axis('off')
+	axs[7, 2].axis('off')
 	# Set window title
 	plt.get_current_fig_manager().set_window_title('Malignant VS Benign')
 
-	plt.show()
+	plt.savefig('../../assets/box_plot.png')

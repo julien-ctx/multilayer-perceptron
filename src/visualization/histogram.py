@@ -26,4 +26,4 @@ if __name__ == '__main__':
 	# Set window title
 	plt.get_current_fig_manager().set_window_title('Malignant VS Benign')
 
-	plt.show()
+	plt.savefig('../../assets/histogram.png')
