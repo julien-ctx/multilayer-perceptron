@@ -104,14 +104,9 @@ class MultilayerPerceptron:
 				grads = self.backpropagation(y_true, activations, weights)
 				exit()
 
+	# https://deepnotes.io/softmax-crossentropy
 	def softmax_derivative(self, activations):
-		derivative_first = activations[:, 0] * (1 - activations[:, 1])
-		derivative_first = np.expand_dims(derivative_first, axis=1)
-
-		derivative_second = -activations[:, 0] * activations[:, 1]
-		derivative_second = np.expand_dims(derivative_second, axis=1)
-
-		return np.hstack((derivative_first, derivative_second))
+		return activations * (1 - activations)
 
 	def training_loss(self, y_pred, y_true):
 		return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
