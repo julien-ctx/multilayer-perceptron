@@ -44,13 +44,13 @@ class MultilayerPerceptron:
 		self.sample = self.sample.apply(lambda x : (x - np.mean(x)) / np.std(x))
 
 	# Activations is an array storing the output of each layer.
-	def get_activations(self, training):
+	def get_activations(self, training, weights):
 		# Input layer output is the raw input features (and the bias)
 		activations = [training]
-		for i in range(len(self.weights) - 1):
-			activations.append(self.ReLU(activations[i] @ self.weights[i]))
+		for i in range(len(weights) - 1):
+			activations.append(self.ReLU(activations[i] @ weights[i]))
 		# Add the output layer activations (without bias this time)
-		activations.append(self.softmax((activations[2] @ self.weights[2]).to_numpy()))
+		activations.append(self.softmax((activations[2] @ weights[2]).to_numpy()))
 		return activations
 		
 	def get_gradient(self, y_true, y_pred):
@@ -64,7 +64,6 @@ class MultilayerPerceptron:
 	def backpropagation(self, y_true, activations, weights, training):
 		# The following output delta formula is the simplified version of self.get_gradient(y_true, activations[-1]) * self.softmax_derivative(activations[-1])
 		output_delta = activations[-1] - y_true
-		# print(self.ReLU_derivative(activations[-2]).shape)
 		second_hidden_layer_delta = (output_delta @ weights[2].T) * self.ReLU_derivative(activations[-2])
 		first_hidden_layer_delta = (second_hidden_layer_delta @ weights[1].T)  * self.ReLU_derivative(activations[-3])
 		weights[2] -= (self.alpha * (activations[-2].T @ output_delta)).to_numpy()
@@ -72,10 +71,12 @@ class MultilayerPerceptron:
 		weights[0] -= (self.alpha * (training.T @ first_hidden_layer_delta)).to_numpy()
 		return weights
 	
-	def print_loss(self, i, epoch, y_true, training_diagnosis):
-		pass
-		# self.training_loss(activations[-1], training)
-		# print(f"Fold {i + 1}/10 - Epoch {epoch}/{self.epochs} - Loss {self.training_loss(activations, training)} - Validation Loss {self.loss(activations, validation)}")
+	def print_loss(self, i, epoch, y_pred, training_diag, validation_diag):
+		loss = self.loss(y_pred, training_diag)
+		print(loss)
+		exit()
+		# validation_loss = self.loss(y_pred, validation_diag)
+		print(f"Fold {i + 1}/10 - Epoch {epoch}/{self.epochs} - Loss {self.loss(activations, training)} - Validation Loss {self.loss(activations, validation)}")
 
 	def fit(self):
 		self.hidden_size = (self.sample.shape[1] + 2) // 2 + 1 # + 1 for bias
@@ -98,23 +99,23 @@ class MultilayerPerceptron:
 			weights = self.weights
 			training = self.sample.iloc[training_i, :]
 			training = self.add_bias(training)
-			training_diagnosis = self.diagnosis[training_i, :]
+			training_diag = self.diagnosis[training_i, :]
+			training_diag = np.concatenate([training_diag == 1.0, training_diag == 0.0], axis=1).astype(float)
 			validation = self.sample.iloc[validation_i, :]
-			validation_diagnosis = self.diagnosis[validation_i, :]
-			y_true = np.where(training_diagnosis > 0, np.array([1.0, 0.0]), np.array([0.0, 1.0]))
+			validation_diag = self.diagnosis[validation_i, :]
+			validation_diag = np.concatenate([validation_diag == 1.0, validation_diag == 0.0], axis=1).astype(float)
 			for epoch in range(self.epochs):
 				# Getting activations is computing the output of each layer using feedforward technique.
-				activations = self.get_activations(training)
-				# self.print_loss(i, epoch, activations[-1], training_diagnosis)
+				activations = self.get_activations(training, weights)
+			# self.print_loss(i, epoch, activations[-1], training_diag, validation_diag)
 				# np.where is need to one hot encode the true output. Because we have 2 neurons in the output layer, we need to transform the true values in 2 columns too.
-				weights = self.backpropagation(y_true, activations, weights, training)
-			print(weights)
-			exit()
-			all_weights.append(weights)
+				weights = self.backpropagation(training_diag, activations, weights, training)
+			# all_weights.append(weights)
+			weights = np.array(weights, dtype=object)
+			np.save('../../assets/weights.npy', weights)
 			break
 
-
-	def training_loss(self, y_pred, y_true):
+	def loss(self, y_pred, y_true):
 		return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
 	
 	# Softmax is used by neurons of output layer.
