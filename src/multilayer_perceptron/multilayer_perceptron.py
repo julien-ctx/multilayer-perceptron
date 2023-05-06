@@ -46,7 +46,7 @@ class MultilayerPerceptron:
 	# Activations is an array storing the output of each layer.
 	def get_activations(self, training):
 		# Input layer output is the raw input features (and the bias)
-		activations = [self.add_bias(training)]
+		activations = [training]
 		for i in range(len(self.weights) - 1):
 			activations.append(self.ReLU(activations[i] @ self.weights[i]))
 		# Add the output layer activations (without bias this time)
@@ -60,11 +60,17 @@ class MultilayerPerceptron:
 		epsilon = 1e-8
 		return -y_true / (y_pred + epsilon) + (1 - y_true) / (1 - y_pred + epsilon)
 
-	def backpropagation(self, y_true, activations, weights):
-		output_delta = self.get_gradient(y_true, activations[-1]) * self.softmax_derivative(activations[-1])
-		second_hidden_layer_delta =  (output_delta @ weights[2].T) * self.ReLU_derivative(activations[-2])
-		third_hidden_layer_delta = second_hidden_layer_delta @ weights[1].T  * self.ReLU_derivative(activations[-3])
-		exit()
+	# https://www.youtube.com/watch?v=lglt8BZ6Ld4
+	def backpropagation(self, y_true, activations, weights, training):
+		# The following output delta formula is the simplified version of self.get_gradient(y_true, activations[-1]) * self.softmax_derivative(activations[-1])
+		output_delta = activations[-1] - y_true
+		# print(self.ReLU_derivative(activations[-2]).shape)
+		second_hidden_layer_delta = (output_delta @ weights[2].T) * self.ReLU_derivative(activations[-2])
+		first_hidden_layer_delta = (second_hidden_layer_delta @ weights[1].T)  * self.ReLU_derivative(activations[-3])
+		weights[2] -= (self.alpha * (activations[-2].T @ output_delta)).to_numpy()
+		weights[1] -= (self.alpha * (activations[-3].T @ second_hidden_layer_delta)).to_numpy()
+		weights[0] -= (self.alpha * (training.T @ first_hidden_layer_delta)).to_numpy()
+		return weights
 	
 	def print_loss(self, i, epoch, y_true, training_diagnosis):
 		pass
@@ -84,23 +90,28 @@ class MultilayerPerceptron:
 			np.random.randn(self.hidden_size, 2)
 		]
 
+		all_weights = []
 		# Generate folds to follow the subject guidelines.
 		kf = KFold(n_splits=10)
 		# training_i and validation_i are indices for data in self.sample for each fold.
 		for i, (training_i, validation_i) in enumerate(kf.split(self.sample)):
 			weights = self.weights
 			training = self.sample.iloc[training_i, :]
-			validation = self.sample.iloc[validation_i, :]
+			training = self.add_bias(training)
 			training_diagnosis = self.diagnosis[training_i, :]
-			training_validation = self.diagnosis[validation_i, :]
+			validation = self.sample.iloc[validation_i, :]
+			validation_diagnosis = self.diagnosis[validation_i, :]
 			y_true = np.where(training_diagnosis > 0, np.array([1.0, 0.0]), np.array([0.0, 1.0]))
 			for epoch in range(self.epochs):
 				# Getting activations is computing the output of each layer using feedforward technique.
 				activations = self.get_activations(training)
 				# self.print_loss(i, epoch, activations[-1], training_diagnosis)
 				# np.where is need to one hot encode the true output. Because we have 2 neurons in the output layer, we need to transform the true values in 2 columns too.
-				grads = self.backpropagation(y_true, activations, weights)
-				exit()
+				weights = self.backpropagation(y_true, activations, weights, training)
+			print(weights)
+			exit()
+			all_weights.append(weights)
+			break
 
 
 	def training_loss(self, y_pred, y_true):
