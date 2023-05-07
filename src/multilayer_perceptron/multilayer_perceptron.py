@@ -12,7 +12,7 @@ from sklearn.model_selection import KFold
 class MultilayerPerceptron:
 	def __init__(self, df):
 		self.sample = df
-		self.alpha = 0.001
+		self.alpha = 0.0001
 		self.epochs = 1000
 	
 	def drop_irrelevant_data(self):
@@ -71,49 +71,55 @@ class MultilayerPerceptron:
 		weights[0] -= (self.alpha * (training.T @ first_hidden_layer_delta)).to_numpy()
 		return weights
 	
-	def print_loss(self, i, epoch, y_pred, training_diag, validation_diag):
-		training_loss = self.loss(y_pred, training_diag)
-		training_accuracy = self.accuracy(y_pred, training_diag)
-		# validation_loss = np.round(self.loss(y_pred, validation_diag), 4)
-		if epoch == 999:
-			print(f"Fold {i + 1}/10 - Epoch {epoch + 1}/{self.epochs} - Loss {training_loss} (Accuracy: {training_accuracy}%)")
+	def print_loss(self, i, epoch, training_y_pred, validation_y_pred, training_diag, validation_diag):
+		training_loss = self.loss(training_y_pred, training_diag)
+		training_accuracy = self.accuracy(training_y_pred, training_diag)
+		validation_loss = self.loss(validation_y_pred, validation_diag)
+		validation_accuracy = self.accuracy(validation_y_pred, validation_diag)	
+		if epoch % 20 == 0 or epoch == 1:
+			print(f"Fold {i}/10 - Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%)")
 
 	def fit(self):
 		self.hidden_size = (self.sample.shape[1] + 2) // 2 + 1 # + 1 for bias
-
-		# Gives a seed to numpy to understand that random values will always be the same after running the program several times.
-		np.random.seed(42)
-		# https://github.com/christianversloot/machine-learning-articles/blob/main/he-xavier-initialization-activation-functions-choose-wisely.md
-		# https://cs230.stanford.edu/section/4/
-		self.weights = [
-			np.random.randn(self.sample.shape[1] + 1, self.hidden_size),
-			np.random.randn(self.hidden_size, self.hidden_size),
-			np.random.randn(self.hidden_size, 2)
-		]
-
-		all_weights = []
+		self.weights = []
+		
 		# Generate folds to follow the subject guidelines.
 		kf = KFold(n_splits=10)
 		# training_i and validation_i are indices for data in self.sample for each fold.
 		for i, (training_i, validation_i) in enumerate(kf.split(self.sample)):
-			weights = self.weights
+			# Gives a seed to numpy to understand that random values will always be the same after running the program several times.
+			np.random.seed(42 + i)
+			# https://github.com/christianversloot/machine-learning-articles/blob/main/he-xavier-initialization-activation-functions-choose-wisely.md
+			# https://cs230.stanford.edu/section/4/
+			weights = [
+				np.random.randn(self.sample.shape[1] + 1, self.hidden_size) * np.sqrt(1 / (self.sample.shape[1] + 1)),
+				np.random.randn(self.hidden_size, self.hidden_size) * np.sqrt(1 / self.hidden_size),
+				np.random.randn(self.hidden_size, 2) * np.sqrt(1 / self.hidden_size)
+			]
+			# Get training and validation batches.
 			training = self.sample.iloc[training_i, :]
 			training = self.add_bias(training)
 			training_diag = self.diagnosis[training_i, :]
 			training_diag = np.concatenate([training_diag == 1.0, training_diag == 0.0], axis=1).astype(float)
 			validation = self.sample.iloc[validation_i, :]
+			validation = self.add_bias(validation)
 			validation_diag = self.diagnosis[validation_i, :]
 			validation_diag = np.concatenate([validation_diag == 1.0, validation_diag == 0.0], axis=1).astype(float)
+
 			for epoch in range(self.epochs):
 				# Getting activations is computing the output of each layer using feedforward technique.
-				activations = self.get_activations(training, weights)
-				self.print_loss(i, epoch, activations[-1], training_diag, validation_diag)
+				training_activations = self.get_activations(training, weights)
+				validation_activations = self.get_activations(validation, weights)	
+				self.print_loss(i + 1, epoch + 1, training_activations[-1], validation_activations[-1], training_diag, validation_diag)
 				# np.where is need to one hot encode the true output. Because we have 2 neurons in the output layer, we need to transform the true values in 2 columns too.
-				weights = self.backpropagation(training_diag, activations, weights, training)
+				weights = self.backpropagation(training_diag, training_activations, weights, training)
+			self.weights.append(weights)
 			print()
-			# all_weights.append(weights)
-		weights = np.array(weights, dtype=object)
-		np.save('../../assets/weights.npy', weights)
+		means = []
+		for i in range(3):
+			means.append(np.mean([weight[i] for weight in self.weights], axis=0))
+		means = np.array(means, dtype=object)
+		np.save('../../assets/weights.npy', means)
 
 	# Accuracy score, as a percentage, inspired from scikit learn.
 	def accuracy(self, y_pred, y_true):
