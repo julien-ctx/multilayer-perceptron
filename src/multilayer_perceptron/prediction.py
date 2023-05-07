@@ -5,14 +5,12 @@ from multilayer_perceptron import MultilayerPerceptron
 sys.path.append('..')
 from utils import get_df
 
-
-
 if __name__ == '__main__':
     if not os.path.exists("../../assets/weights.npy"):
         sys.exit("Error: no weights available for prediction.")
     with open('../../assets/weights.npy', 'rb') as f:
         weights = np.load(f, allow_pickle=True)
-    df = pd.read_csv('../../assets/data_test.csv', )
+    df = pd.read_csv('../../assets/data_test.csv', header=None)
     df.columns = [f"Feature {i + 1}" for i in range(len(df.columns))]
     df = df.drop('Feature 13', axis=1).drop('Feature 15', axis=1)
     model = MultilayerPerceptron(df)

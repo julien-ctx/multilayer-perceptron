@@ -72,11 +72,11 @@ class MultilayerPerceptron:
 		return weights
 	
 	def print_loss(self, i, epoch, y_pred, training_diag, validation_diag):
-		loss = self.loss(y_pred, training_diag)
-		print(loss)
-		exit()
-		# validation_loss = self.loss(y_pred, validation_diag)
-		print(f"Fold {i + 1}/10 - Epoch {epoch}/{self.epochs} - Loss {self.loss(activations, training)} - Validation Loss {self.loss(activations, validation)}")
+		training_loss = self.loss(y_pred, training_diag)
+		training_accuracy = self.accuracy(y_pred, training_diag)
+		# validation_loss = np.round(self.loss(y_pred, validation_diag), 4)
+		if epoch == 999:
+			print(f"Fold {i + 1}/10 - Epoch {epoch + 1}/{self.epochs} - Loss {training_loss} (Accuracy: {training_accuracy}%)")
 
 	def fit(self):
 		self.hidden_size = (self.sample.shape[1] + 2) // 2 + 1 # + 1 for bias
@@ -107,16 +107,27 @@ class MultilayerPerceptron:
 			for epoch in range(self.epochs):
 				# Getting activations is computing the output of each layer using feedforward technique.
 				activations = self.get_activations(training, weights)
-			# self.print_loss(i, epoch, activations[-1], training_diag, validation_diag)
+				self.print_loss(i, epoch, activations[-1], training_diag, validation_diag)
 				# np.where is need to one hot encode the true output. Because we have 2 neurons in the output layer, we need to transform the true values in 2 columns too.
 				weights = self.backpropagation(training_diag, activations, weights, training)
+			print()
 			# all_weights.append(weights)
-			weights = np.array(weights, dtype=object)
-			np.save('../../assets/weights.npy', weights)
-			break
+		weights = np.array(weights, dtype=object)
+		np.save('../../assets/weights.npy', weights)
+
+	# Accuracy score, as a percentage, inspired from scikit learn.
+	def accuracy(self, y_pred, y_true):
+		y_pred = np.where(y_pred == np.max(y_pred, axis=1)[:, np.newaxis], 1.0, y_pred)
+		y_pred = np.where(y_pred == np.min(y_pred, axis=1)[:, np.newaxis], 0.0, y_pred)
+		correct_predictions = np.sum(np.equal(y_pred, y_true).all(axis=1))
+		return np.round(correct_predictions * 100 / y_pred.shape[0], 2)
 
 	def loss(self, y_pred, y_true):
-		return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+		# Log function is undefined for 0 and < 0 values. Therefore we add epsilon to avoid endless values.
+		epsilon = 1e-8
+		# Clips y_pred in range [epsilon, 1 - epsilon], replacing < epsilon values by epsilon.
+		y_pred = np.clip(y_pred, epsilon, 1 - epsilon)
+		return np.round(-np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)), 4)
 	
 	# Softmax is used by neurons of output layer.
 	def softmax(self, z):
