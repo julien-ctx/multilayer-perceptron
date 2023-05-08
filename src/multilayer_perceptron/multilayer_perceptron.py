@@ -15,8 +15,8 @@ from utils import color
 class MultilayerPerceptron:
 	def __init__(self, df):
 		self.sample = df
-		self.alpha = 0.01
-		self.epochs = 1000
+		self.alpha = 0.001
+		self.epochs = 200
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -48,6 +48,13 @@ class MultilayerPerceptron:
 	def standardize(self):
 		self.sample = self.sample.apply(lambda x : (x - np.mean(x)) / np.std(x))
 
+	def get_gradient(self, y_true, y_pred):
+		# https://stats.stackexchange.com/questions/370723/how-to-calculate-the-derivative-of-crossentropy-error-function
+		# Gradient is different from logistic regression because the cross entropy loss function is not the same.
+		# Add epsilon to avoid division by zero
+		epsilon = 1e-8
+		return -y_true / (y_pred + epsilon) + (1 - y_true) / (1 - y_pred + epsilon)
+
 	# Activations is an array storing the output of each layer.
 	def get_activations(self, training, weights):
 		# Input layer output is the raw input features (and the bias)
@@ -57,75 +64,69 @@ class MultilayerPerceptron:
 		# Add the output layer activations (without bias this time)
 		activations.append(self.softmax((activations[2] @ weights[2]).to_numpy()))
 		return activations
-		
-	def get_gradient(self, y_true, y_pred):
-		# https://stats.stackexchange.com/questions/370723/how-to-calculate-the-derivative-of-crossentropy-error-function
-		# Gradient is different from logistic regression because the cross entropy loss function is not the same.
-		# Add epsilon to avoid division by zero
-		epsilon = 1e-8
-		return -y_true / (y_pred + epsilon) + (1 - y_true) / (1 - y_pred + epsilon)
 
 	# https://www.youtube.com/watch?v=lglt8BZ6Ld4
 	def backpropagation(self, y_true, activations, weights, training):
 		# The following output delta formula is the simplified version of self.get_gradient(y_true, activations[-1]) * self.softmax_derivative(activations[-1])
-		output_delta = activations[-1] - y_true
-		second_hidden_layer_delta = (output_delta @ weights[2].T) * self.ReLU_derivative(activations[-2])
-		first_hidden_layer_delta = (second_hidden_layer_delta @ weights[1].T)  * self.ReLU_derivative(activations[-3])
-		weights[2] -= (self.alpha * (activations[-2].T @ output_delta)).to_numpy()
-		weights[1] -= (self.alpha * (activations[-3].T @ second_hidden_layer_delta)).to_numpy()
-		weights[0] -= (self.alpha * (training.T @ first_hidden_layer_delta)).to_numpy()
+		layers_delta = [activations[-1] - y_true]
+		weights_it = len(weights) - 1
+		for i in range(weights_it):
+			layers_delta.append((layers_delta[i] @ weights[weights_it - i].T) * self.ReLU_derivative(activations[-weights_it - i]))
+		for i in range(weights_it):
+			weights[weights_it - i] -= (self.alpha * (activations[-weights_it - i].T @ layers_delta[i]))#.to_numpy()
+		weights[0] -= (self.alpha * (training.T @ layers_delta[-1])).to_numpy()
 		return weights
 	
-	def print_loss(self, i, epoch, training_y_pred, validation_y_pred, training_diag, validation_diag):
+	def print_loss(self, epoch, training_y_pred, validation_y_pred, training_diag, validation_diag):
 		training_loss = self.loss(training_y_pred, training_diag)
 		training_accuracy = self.accuracy(training_y_pred, training_diag)
 		validation_loss = self.loss(validation_y_pred, validation_diag)
 		validation_accuracy = self.accuracy(validation_y_pred, validation_diag)	
 		if epoch == self.epochs:
-			print(f"{color.GREEN}Fold {i}/10 - Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
+			print(f"{color.GREEN}Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
 		elif epoch < 20 or epoch % 10 == 0:
-			print(f"{color.BOLD}Fold {i}/10 - Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
+			print(f"{color.BOLD}Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
+		return validation_loss
 
 	def fit(self):
-		self.hidden_size = 12#(self.sample.shape[1] + 2) // 2 + 1 # + 1 for bias
-		self.weights = []
+		self.hidden_size = (self.sample.shape[1] + 2) // 2 + 1 # Add one for bias
 		
-		# Generate folds to follow the subject guidelines.
-		kf = KFold(n_splits=10)
-		# training_i and validation_i are indices for data in self.sample for each fold.
-		for i, (training_i, validation_i) in enumerate(kf.split(self.sample)):
-			# Gives a seed to numpy to understand that random values will always be the same after running the program several times.
-			np.random.seed(42 + i)
-			# https://github.com/christianversloot/machine-learning-articles/blob/main/he-xavier-initialization-activation-functions-choose-wisely.md
-			# https://cs230.stanford.edu/section/4/
-			weights = [
-				np.random.randn(self.sample.shape[1] + 1, self.hidden_size) * np.sqrt(1 / (self.sample.shape[1] + 1)),
-				np.random.randn(self.hidden_size, self.hidden_size) * np.sqrt(1 / self.hidden_size),
-				np.random.randn(self.hidden_size, 2) * np.sqrt(1 / self.hidden_size)
-			]
-			# Get training and validation batches.
-			training = self.sample.iloc[training_i, :]
-			training = self.add_bias(training)
-			training_diag = self.diagnosis[training_i, :]
-			training_diag = np.concatenate([training_diag == 1.0, training_diag == 0.0], axis=1).astype(float)
-			validation = self.sample.iloc[validation_i, :]
-			validation = self.add_bias(validation)
-			validation_diag = self.diagnosis[validation_i, :]
-			validation_diag = np.concatenate([validation_diag == 1.0, validation_diag == 0.0], axis=1).astype(float)
-			for epoch in range(self.epochs):
-				# Getting activations is computing the output of each layer using feedforward technique.
-				training_activations = self.get_activations(training, weights)
-				validation_activations = self.get_activations(validation, weights)	
-				self.print_loss(i + 1, epoch + 1, training_activations[-1], validation_activations[-1], training_diag, validation_diag)
-				weights = self.backpropagation(training_diag, training_activations, weights, training)
-			self.weights.append(weights)
-			print()
-			break
-		means = []
-		for i in range(3):
-			means.append(np.mean([weight[i] for weight in self.weights], axis=0))
-		means = np.array(means, dtype=object)
-		np.save('../../assets/weights.npy', means)
+		# Split the data into training and validation sets
+		split_index = int(0.8 * len(self.sample))
+		training = self.sample[:split_index]
+		validation = self.sample[split_index:]
+		
+		# Add bias column to the training and validation sets
+		training = self.add_bias(training)
+		validation = self.add_bias(validation)
+		
+		# Convert the diagnosis values to one-hot encoded vectors
+		training_diag = self.diagnosis[:split_index]
+		training_diag = np.concatenate([training_diag == 1.0, training_diag == 0.0], axis=1).astype(float)
+		validation_diag = self.diagnosis[split_index:]
+		validation_diag = np.concatenate([validation_diag == 1.0, validation_diag == 0.0], axis=1).astype(float)
+		
+		# Initialize weights
+		np.random.seed(42)
+		self.weights = [
+			np.random.randn(self.sample.shape[1] + 1, self.hidden_size) * np.sqrt(1 / (self.sample.shape[1] + 1)),
+			np.random.randn(self.hidden_size, self.hidden_size) * np.sqrt(1 / self.hidden_size),
+			np.random.randn(self.hidden_size, 2) * np.sqrt(1 / self.hidden_size)
+		]
+		prev_validation_loss = None
+		for epoch in range(self.epochs):
+			# Getting activations is computing the output activation of each layer using feedforward technique.
+			training_activations = self.get_activations(training, self.weights)
+			validation_activations = self.get_activations(validation, self.weights)    
+			self.weights = self.backpropagation(training_diag, training_activations, self.weights, training)
+
+			validation_loss = self.print_loss(epoch + 1, training_activations[-1], validation_activations[-1], training_diag, validation_diag)
+			if not prev_validation_loss or prev_validation_loss >= validation_loss:
+				prev_validation_loss = validation_loss
+			else:
+				break
+		self.weights = np.array(self.weights, dtype=object)
+		np.save('../../assets/weights.npy', self.weights)
 
 	# Accuracy score, as a percentage, inspired from scikit learn.
 	def accuracy(self, y_pred, y_true):
