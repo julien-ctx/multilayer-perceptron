@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 from scipy.stats import ks_2samp
 from sklearn.model_selection import KFold
+import sys
+sys.path.append('..')
+from utils import color
 
 # A few interesting theories to determine the number of neurons in every hidden layer:
 # The number of hidden neurons should be between the size of the input layer and the size of the output layer.
@@ -12,8 +15,8 @@ from sklearn.model_selection import KFold
 class MultilayerPerceptron:
 	def __init__(self, df):
 		self.sample = df
-		self.alpha = 0.0001
-		self.epochs = 1000
+		self.alpha = 0.001
+		self.epochs = 140
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -22,17 +25,19 @@ class MultilayerPerceptron:
 		# If pvalue 0.05, we can exclude this hypothesis that samples distributions are similar.
 		# https://fr.wikipedia.org/wiki/Test_de_Kolmogorov-Smirnov
 
+		features_to_drop = []
 		sample = self.sample
 		for i, feature in enumerate(self.sample.drop('Diagnosis', axis=1).columns):
 			statistic, pvalue = ks_2samp(self.sample[self.sample.Diagnosis != 1.0][feature], self.sample[self.sample.Diagnosis != 0.0][feature])
 			if pvalue > 0.05:
+				features_to_drop.append(feature)
 				sample = sample.drop(feature, axis=1)
-				
 		self.sample = sample
   
 		# Separate the diagnosis from the input layer.
 		self.diagnosis = self.sample.Diagnosis.to_numpy().reshape(-1, 1)
 		self.sample = self.sample.drop('Diagnosis', axis=1)
+		np.save('../../assets/features.npy', features_to_drop)
 
 	def add_bias(self, array):
 		# Copy to let pandas understand I don't want to edit the original df.
@@ -76,8 +81,10 @@ class MultilayerPerceptron:
 		training_accuracy = self.accuracy(training_y_pred, training_diag)
 		validation_loss = self.loss(validation_y_pred, validation_diag)
 		validation_accuracy = self.accuracy(validation_y_pred, validation_diag)	
-		if epoch % 20 == 0 or epoch == 1:
-			print(f"Fold {i}/10 - Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%)")
+		if epoch == self.epochs:
+			print(f"{color.GREEN}Fold {i}/10 - Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
+		elif epoch < 20 or epoch % 10 == 0:
+			print(f"{color.BOLD}Fold {i}/10 - Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
 
 	def fit(self):
 		self.hidden_size = (self.sample.shape[1] + 2) // 2 + 1 # + 1 for bias
@@ -105,13 +112,11 @@ class MultilayerPerceptron:
 			validation = self.add_bias(validation)
 			validation_diag = self.diagnosis[validation_i, :]
 			validation_diag = np.concatenate([validation_diag == 1.0, validation_diag == 0.0], axis=1).astype(float)
-
 			for epoch in range(self.epochs):
 				# Getting activations is computing the output of each layer using feedforward technique.
 				training_activations = self.get_activations(training, weights)
 				validation_activations = self.get_activations(validation, weights)	
 				self.print_loss(i + 1, epoch + 1, training_activations[-1], validation_activations[-1], training_diag, validation_diag)
-				# np.where is need to one hot encode the true output. Because we have 2 neurons in the output layer, we need to transform the true values in 2 columns too.
 				weights = self.backpropagation(training_diag, training_activations, weights, training)
 			self.weights.append(weights)
 			print()

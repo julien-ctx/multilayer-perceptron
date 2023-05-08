@@ -5,9 +5,6 @@ import sys
 sys.path.append('..')
 from utils import get_df
 
-# 212 are malignant
-# 357 are benign
-
 if __name__ == '__main__':
 	df = get_df()
 	

@@ -3,12 +3,13 @@ import numpy as np
 import sys, os
 from multilayer_perceptron import MultilayerPerceptron
 sys.path.append('..')
-from utils import get_df
+from utils import get_df, color
 
 if __name__ == '__main__':
-	if os.path.exists("weights.csv"):
-		os.remove("weights.csv")
-	df = get_df()
+	if len(sys.argv) != 2:
+		sys.exit(f"{color.RED}Error: invalid number of arguments.{color.END}")
+
+	df = get_df(sys.argv[1])
  
 	model = MultilayerPerceptron(df)
 
