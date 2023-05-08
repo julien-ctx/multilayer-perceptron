@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import ks_2samp
 from sklearn.model_selection import KFold
+import matplotlib.pyplot as plt
 import sys
 sys.path.append('..')
 from utils import color
@@ -82,11 +83,25 @@ class MultilayerPerceptron:
 		training_accuracy = self.accuracy(training_y_pred, training_diag)
 		validation_loss = self.loss(validation_y_pred, validation_diag)
 		validation_accuracy = self.accuracy(validation_y_pred, validation_diag)	
-		if epoch == self.epochs:
-			print(f"{color.GREEN}Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
-		elif epoch < 20 or epoch % 10 == 0:
-			print(f"{color.BOLD}Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
-		return validation_loss
+		print(f"{color.BOLD}Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
+		return training_loss, validation_loss
+
+	def print_plots(self, training_losses, validation_losses, total_epochs):
+		fig, (ax1, ax2) = plt.subplots(1, 2)
+		x = [x for x in range(total_epochs + 1)]
+		ax1.plot(x, training_losses, color='blue', label='Training Loss Curve')
+		ax1.set_xlabel('Epochs')
+		ax1.set_ylabel('Loss')
+		ax1.set_title('Training Loss Curve')
+
+		ax2.plot(x, validation_losses, color='orange', label='Validation Loss Curve')
+		ax2.set_xlabel('Epochs')
+		ax2.set_ylabel('Loss')
+		ax2.set_title('Validation Loss Curve')
+
+		plt.tight_layout()
+
+		plt.show()
 
 	def fit(self):
 		self.hidden_size = (self.sample.shape[1] + 2) // 2 + 1 # Add one for bias
@@ -113,20 +128,25 @@ class MultilayerPerceptron:
 			np.random.randn(self.hidden_size, self.hidden_size) * np.sqrt(1 / self.hidden_size),
 			np.random.randn(self.hidden_size, 2) * np.sqrt(1 / self.hidden_size)
 		]
-		prev_validation_loss = None
+  
+		training_losses = []
+		validation_losses = []
+  
 		for epoch in range(self.epochs):
 			# Getting activations is computing the output activation of each layer using feedforward technique.
 			training_activations = self.get_activations(training, self.weights)
 			validation_activations = self.get_activations(validation, self.weights)    
 			self.weights = self.backpropagation(training_diag, training_activations, self.weights, training)
 
-			validation_loss = self.print_loss(epoch + 1, training_activations[-1], validation_activations[-1], training_diag, validation_diag)
-			if not prev_validation_loss or prev_validation_loss >= validation_loss:
-				prev_validation_loss = validation_loss
-			else:
+			training_loss, validation_loss = self.print_loss(epoch + 1, training_activations[-1], validation_activations[-1], training_diag, validation_diag)
+			training_losses.append(training_loss)
+			validation_losses.append(validation_loss)
+			if len(validation_losses) > 1 and validation_losses[-2] <= validation_losses[-1]:
+				self.epochs = epoch
 				break
 		self.weights = np.array(self.weights, dtype=object)
 		np.save('../../assets/weights.npy', self.weights)
+		self.print_plots(training_losses, validation_losses, self.epochs)
 
 	# Accuracy score, as a percentage, inspired from scikit learn.
 	def accuracy(self, y_pred, y_true):
