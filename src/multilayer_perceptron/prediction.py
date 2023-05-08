@@ -27,6 +27,8 @@ if __name__ == '__main__':
     model = MultilayerPerceptron(df)
     for feature in features_to_drop:
         model.sample = model.sample.drop(feature, axis=1)
+    diagnosis = model.sample['Diagnosis']
+    diagnosis = np.array([[1.0, 0.0] if diag == 1 else [0.0, 1.0] for diag in diagnosis])
     model.sample = model.sample.drop('Diagnosis', axis=1)
     model.standardize()
     model.sample = model.add_bias(model.sample)
@@ -44,4 +46,4 @@ if __name__ == '__main__':
     benign_diff = abs(benign_pred - benign_number) * 100 / benign_number
 
     print(f"{color.BOLD}Accuracy: {color.GREEN}{np.round((100 - malignant_diff + 100 - benign_diff) / 2, 2)}%{color.END}") 
-    print(f"{color.BOLD}Loss: {color.GREEN}{(model.loss(y_pred, y_true))}{color.END}") 
+    print(f"{color.BOLD}Loss: {color.GREEN}{model.loss(activations[-1], diagnosis)}{color.END}") 

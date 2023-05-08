@@ -15,8 +15,8 @@ from utils import color
 class MultilayerPerceptron:
 	def __init__(self, df):
 		self.sample = df
-		self.alpha = 0.001
-		self.epochs = 140
+		self.alpha = 0.01
+		self.epochs = 1000
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -87,7 +87,7 @@ class MultilayerPerceptron:
 			print(f"{color.BOLD}Fold {i}/10 - Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
 
 	def fit(self):
-		self.hidden_size = (self.sample.shape[1] + 2) // 2 + 1 # + 1 for bias
+		self.hidden_size = 12#(self.sample.shape[1] + 2) // 2 + 1 # + 1 for bias
 		self.weights = []
 		
 		# Generate folds to follow the subject guidelines.
@@ -120,6 +120,7 @@ class MultilayerPerceptron:
 				weights = self.backpropagation(training_diag, training_activations, weights, training)
 			self.weights.append(weights)
 			print()
+			break
 		means = []
 		for i in range(3):
 			means.append(np.mean([weight[i] for weight in self.weights], axis=0))
@@ -136,9 +137,7 @@ class MultilayerPerceptron:
 	def loss(self, y_pred, y_true):
 		# Log function is undefined for 0 and < 0 values. Therefore we add epsilon to avoid endless values.
 		epsilon = 1e-8
-		# Clips y_pred in range [epsilon, 1 - epsilon], replacing < epsilon values by epsilon.
-		y_pred = np.clip(y_pred, epsilon, 1 - epsilon)
-		return np.round(-np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)), 4)
+		return np.round(-np.mean(y_true * np.log(y_pred + epsilon) + (1 - y_true) * np.log(1 - y_pred + epsilon)), 4)
 	
 	# Softmax is used by neurons of output layer.
 	def softmax(self, z):
