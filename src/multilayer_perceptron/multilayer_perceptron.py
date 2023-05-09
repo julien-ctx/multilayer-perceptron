@@ -138,6 +138,21 @@ class MultilayerPerceptron:
 		validation = self.add_bias(validation)
 		return training, validation, training_diag, validation_diag
 
+	def early_stopping(self, epoch):
+		if self.algo_type == algo.GD.value:
+			if len(self.validation_losses) > 1 and self.validation_losses[-2] <= self.validation_losses[-1]:
+				print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
+				self.epochs = epoch
+				return True
+		elif self.algo_type == algo.SGD.value:
+			if len(self.validation_losses) > 1 and self.validation_losses[-2] <= self.validation_losses[-1]:
+				print(min(self.training_losses), self.training_losses[-1])
+				if min(self.training_losses) * 2 >= self.training_losses[-1]:
+					print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
+					self.epochs = epoch
+					return True	
+		return False
+
 	def optimize(self, training, training_diag, validation, validation_diag, epoch):
 		# Getting activations is computing the output activation of each layer using feedforward technique.
 		training_activations = self.get_activations(training, self.weights)
@@ -149,12 +164,8 @@ class MultilayerPerceptron:
 		self.training_losses.append(training_loss)
 		self.validation_losses.append(validation_loss)
 
-		if len(self.validation_losses) > 1 and self.validation_losses[-2] <= self.validation_losses[-1]:
-			print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
-			self.epochs = epoch
-			return True
-		return False
-
+		return self.early_stopping(epoch)
+		
 	def fit(self):
 		# Initialize data of the model: hidden layers size, weights...
 		self.set_model_data()
