@@ -139,3 +139,4 @@ tmp_predict.csv
 evaluation.py
 dataset_test.csv
 dataset_training.csv
+*.npy
