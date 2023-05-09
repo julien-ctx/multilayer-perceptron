@@ -3,15 +3,18 @@ import numpy as np
 import sys, os
 from multilayer_perceptron import MultilayerPerceptron
 sys.path.append('..')
-from utils import get_df, color
+from utils import *
 
 if __name__ == '__main__':
-	if len(sys.argv) != 2:
+	if len(sys.argv) == 1 or len(sys.argv) > 3:
 		sys.exit(f"{color.RED}Error: invalid number of arguments.{color.END}")
 
 	df = get_df(sys.argv[1])
  
-	model = MultilayerPerceptron(df)
+	if len(sys.argv) == 2:
+		model = MultilayerPerceptron(df, algo.GD.value)
+	else:
+		model = MultilayerPerceptron(df, sys.argv[2])
 
 	# Features engineering
 	model.drop_irrelevant_data()

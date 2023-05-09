@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os, sys
+from enum import Enum
 
 class color:
    PURPLE = '\033[95m'
@@ -13,6 +14,10 @@ class color:
    BOLD = '\033[1m'
    UNDERLINE = '\033[4m'
    END = '\033[0m'
+
+class algo(Enum):
+    GD = 'GD'
+    NAG = 'NAG'
 
 def get_df(df_name):
 	if not os.path.exists(df_name):

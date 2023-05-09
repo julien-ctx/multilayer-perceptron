@@ -5,7 +5,7 @@ from sklearn.model_selection import KFold
 import matplotlib.pyplot as plt
 import sys
 sys.path.append('..')
-from utils import color
+from utils import *
 
 # A few interesting theories to determine the number of neurons in every hidden layer:
 # The number of hidden neurons should be between the size of the input layer and the size of the output layer.
@@ -14,10 +14,13 @@ from utils import color
 # For this project, let use the mean of number of neurons in input layer, and number of neurons in output layer.
 
 class MultilayerPerceptron:
-	def __init__(self, df):
+	def __init__(self, df, algo_type):
 		self.sample = df
 		self.alpha = 0.001
 		self.epochs = 200
+		if algo_type not in algo.__members__:
+			sys.exit(f"{color.RED}Error: wrong algorithm type specified.{color.END}")
+		self.algo_type = algo_type
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -142,6 +145,7 @@ class MultilayerPerceptron:
 			training_losses.append(training_loss)
 			validation_losses.append(validation_loss)
 			if len(validation_losses) > 1 and validation_losses[-2] <= validation_losses[-1]:
+				print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
 				self.epochs = epoch
 				break
 		self.weights = np.array(self.weights, dtype=object)

@@ -3,7 +3,7 @@ import numpy as np
 import sys, os
 from multilayer_perceptron import MultilayerPerceptron
 sys.path.append('..')
-from utils import get_df, color
+from utils import *
 
 def get_real_diagnosis(df):
     y_true = df['Diagnosis']
@@ -23,8 +23,7 @@ if __name__ == '__main__':
 
     # Real values
     malignant_number, benign_number, y_true = get_real_diagnosis(df)
-
-    model = MultilayerPerceptron(df)
+    model = MultilayerPerceptron(df, algo.GD.value)
     for feature in features_to_drop:
         model.sample = model.sample.drop(feature, axis=1)
     diagnosis = model.sample['Diagnosis']
