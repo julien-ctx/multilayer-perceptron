@@ -48,6 +48,6 @@ On unknow datasets, the model performs pretty well with Accuracy Score above 90%
 
 A few more features have been implemented to enhance the model performance, or to visualize the data:
 
-- Data visualization with histograms, box plots and an heatmap.
+- Data visualization with histograms, box plots and a heatmap.
 - Early stopping to avoid overfitting during training.
 - Stochastic Gradient Descent.

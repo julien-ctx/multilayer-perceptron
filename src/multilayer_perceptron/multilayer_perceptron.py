@@ -22,7 +22,7 @@ class MultilayerPerceptron:
 			sys.exit(f"{color.RED}Error: wrong algorithm type specified.{color.END}")
 		self.algo_type = algo_type
 		if self.algo_type == algo.SGD.value:
-			self.batch_size = int(self.sample.shape[0] / 16)
+			self.batch_size = 96
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -146,7 +146,6 @@ class MultilayerPerceptron:
 				return True
 		elif self.algo_type == algo.SGD.value:
 			if len(self.validation_losses) > 1 and self.validation_losses[-2] <= self.validation_losses[-1]:
-				print(min(self.training_losses), self.training_losses[-1])
 				if min(self.training_losses) * 2 >= self.training_losses[-1]:
 					print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
 					self.epochs = epoch
