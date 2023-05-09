@@ -17,6 +17,7 @@ class color:
 
 class algo(Enum):
     GD = 'GD'
+    SGD = 'SGD'
     NAG = 'NAG'
 
 def get_df(df_name):

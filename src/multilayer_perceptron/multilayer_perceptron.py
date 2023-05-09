@@ -21,6 +21,8 @@ class MultilayerPerceptron:
 		if algo_type not in algo.__members__:
 			sys.exit(f"{color.RED}Error: wrong algorithm type specified.{color.END}")
 		self.algo_type = algo_type
+		if self.algo_type == algo.SGD.value:
+			self.batch_size = int(self.sample.shape[0] / 16)
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -59,7 +61,7 @@ class MultilayerPerceptron:
 		epsilon = 1e-8
 		return -y_true / (y_pred + epsilon) + (1 - y_true) / (1 - y_pred + epsilon)
 
-	# Activations is an array storing the output of each layer.
+	# Activations is an array storing the output of each layer with feedforward.
 	def get_activations(self, training, weights):
 		# Input layer output is the raw input features (and the bias)
 		activations = [training]
@@ -77,7 +79,7 @@ class MultilayerPerceptron:
 		for i in range(weights_it):
 			layers_delta.append((layers_delta[i] @ weights[weights_it - i].T) * self.ReLU_derivative(activations[-weights_it - i]))
 		for i in range(weights_it):
-			weights[weights_it - i] -= (self.alpha * (activations[-weights_it - i].T @ layers_delta[i]))#.to_numpy()
+			weights[weights_it - i] -= (self.alpha * (activations[-weights_it - i].T @ layers_delta[i])).to_numpy()
 		weights[0] -= (self.alpha * (training.T @ layers_delta[-1])).to_numpy()
 		return weights
 	
@@ -89,15 +91,15 @@ class MultilayerPerceptron:
 		print(f"{color.BOLD}Epoch {epoch}/{self.epochs} - Training Loss {training_loss} (Accuracy: {training_accuracy}%) - Validation Loss {validation_loss} (Accuracy: {validation_accuracy}%){color.END}")
 		return training_loss, validation_loss
 
-	def print_plots(self, training_losses, validation_losses, total_epochs):
+	def print_plots(self, total_epochs):
 		fig, (ax1, ax2) = plt.subplots(1, 2)
 		x = [x for x in range(total_epochs + 1)]
-		ax1.plot(x, training_losses, color='blue', label='Training Loss Curve')
+		ax1.plot(x, self.training_losses, color='blue', label='Training Loss Curve')
 		ax1.set_xlabel('Epochs')
 		ax1.set_ylabel('Loss')
 		ax1.set_title('Training Loss Curve')
 
-		ax2.plot(x, validation_losses, color='orange', label='Validation Loss Curve')
+		ax2.plot(x, self.validation_losses, color='orange', label='Validation Loss Curve')
 		ax2.set_xlabel('Epochs')
 		ax2.set_ylabel('Loss')
 		ax2.set_title('Validation Loss Curve')
@@ -106,23 +108,8 @@ class MultilayerPerceptron:
 
 		plt.show()
 
-	def fit(self):
+	def set_model_data(self):
 		self.hidden_size = (self.sample.shape[1] + 2) // 2 + 1 # Add one for bias
-		
-		# Split the data into training and validation sets
-		split_index = int(0.8 * len(self.sample))
-		training = self.sample[:split_index]
-		validation = self.sample[split_index:]
-		
-		# Add bias column to the training and validation sets
-		training = self.add_bias(training)
-		validation = self.add_bias(validation)
-		
-		# Convert the diagnosis values to one-hot encoded vectors
-		training_diag = self.diagnosis[:split_index]
-		training_diag = np.concatenate([training_diag == 1.0, training_diag == 0.0], axis=1).astype(float)
-		validation_diag = self.diagnosis[split_index:]
-		validation_diag = np.concatenate([validation_diag == 1.0, validation_diag == 0.0], axis=1).astype(float)
 		
 		# Initialize weights
 		np.random.seed(42)
@@ -131,26 +118,62 @@ class MultilayerPerceptron:
 			np.random.randn(self.hidden_size, self.hidden_size) * np.sqrt(1 / self.hidden_size),
 			np.random.randn(self.hidden_size, 2) * np.sqrt(1 / self.hidden_size)
 		]
-  
-		training_losses = []
-		validation_losses = []
-  
-		for epoch in range(self.epochs):
-			# Getting activations is computing the output activation of each layer using feedforward technique.
-			training_activations = self.get_activations(training, self.weights)
-			validation_activations = self.get_activations(validation, self.weights)    
-			self.weights = self.backpropagation(training_diag, training_activations, self.weights, training)
+		self.training_losses = []
+		self.validation_losses = []
 
-			training_loss, validation_loss = self.print_loss(epoch + 1, training_activations[-1], validation_activations[-1], training_diag, validation_diag)
-			training_losses.append(training_loss)
-			validation_losses.append(validation_loss)
-			if len(validation_losses) > 1 and validation_losses[-2] <= validation_losses[-1]:
-				print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
-				self.epochs = epoch
-				break
+	def get_training_data(self):
+		# Split the data into training and validation sets
+		split_index = int(0.8 * len(self.sample))
+		training = self.sample[:split_index]
+		validation = self.sample[split_index:]
+		
+		# Convert the diagnosis values to one-hot encoded vectors
+		training_diag = self.diagnosis[:split_index]
+		training_diag = np.concatenate([training_diag == 1.0, training_diag == 0.0], axis=1).astype(float)
+		validation_diag = self.diagnosis[split_index:]
+		validation_diag = np.concatenate([validation_diag == 1.0, validation_diag == 0.0], axis=1).astype(float)
+
+		# Add bias column to the training and validation sets
+		training = self.add_bias(training)
+		validation = self.add_bias(validation)
+		return training, validation, training_diag, validation_diag
+
+	def optimize(self, training, training_diag, validation, validation_diag, epoch):
+		# Getting activations is computing the output activation of each layer using feedforward technique.
+		training_activations = self.get_activations(training, self.weights)
+		validation_activations = self.get_activations(validation, self.weights)    
+		self.weights = self.backpropagation(training_diag, training_activations, self.weights, training)
+
+		training_loss, validation_loss = self.print_loss(epoch + 1, training_activations[-1], validation_activations[-1], training_diag, validation_diag)
+
+		self.training_losses.append(training_loss)
+		self.validation_losses.append(validation_loss)
+
+		if len(self.validation_losses) > 1 and self.validation_losses[-2] <= self.validation_losses[-1]:
+			print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
+			self.epochs = epoch
+			return True
+		return False
+
+	def fit(self):
+		# Initialize data of the model: hidden layers size, weights...
+		self.set_model_data()
+		# Get training set, validation set, training diagnosis, validation diagnosis (true values)
+		training, validation, training_diag, validation_diag = self.get_training_data()
+		for epoch in range(self.epochs):
+			if self.algo_type == algo.GD.value:
+				if self.optimize(training, training_diag, validation, validation_diag, epoch):
+					break
+
+			elif self.algo_type == algo.SGD.value:
+				batch = training.sample(n=self.batch_size)
+				diagnosis = training_diag[batch.index]
+				if self.optimize(batch, diagnosis, validation, validation_diag, epoch):
+					break
+	
 		self.weights = np.array(self.weights, dtype=object)
 		np.save('../../assets/weights.npy', self.weights)
-		self.print_plots(training_losses, validation_losses, self.epochs)
+		self.print_plots(self.epochs)
 
 	# Accuracy score, as a percentage, inspired from scikit learn.
 	def accuracy(self, y_pred, y_true):
