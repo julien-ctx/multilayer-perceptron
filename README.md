@@ -20,5 +20,5 @@ It contains information about the shape, color and texture of each tumor, and I 
 
 A few more features have been implemented to enhance the model performance, or to visualize the data:
 
-- Training and validation loss curve plots.
+- Data visualization with histograms, box plots and an heatmap.
 - Early stopping to avoid overfitting during training.
