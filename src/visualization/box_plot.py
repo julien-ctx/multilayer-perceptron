@@ -6,7 +6,7 @@ sys.path.append('..')
 from utils import get_df
 
 if __name__ == '__main__':
-	df = get_df()
+	df = get_df('../../assets/data.csv')
 
 	fig, axs = plt.subplots(nrows=8, ncols=4, figsize=(16, 9))
 	# Change color properties

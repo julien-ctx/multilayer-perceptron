@@ -7,7 +7,7 @@ sys.path.append('..')
 from utils import get_df
 
 if __name__ == '__main__':
-	df = get_df()
+	df = get_df('../../assets/data.csv')
 	# Get correlation matrix
 	# -1 indicates strong negative correlation
 	# 1 indicates strong positive correlation

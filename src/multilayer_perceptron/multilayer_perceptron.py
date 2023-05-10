@@ -213,6 +213,9 @@ class MultilayerPerceptron:
 		correct_predictions = np.sum(np.equal(y_pred, y_true).all(axis=1))
 		return np.round(correct_predictions * 100 / y_pred.shape[0], 2)
 
+	def mse(self, y_pred, y_true):
+		return np.mean((y_pred - y_true) ** 2)
+
 	def loss(self, y_pred, y_true):
 		# Log function is undefined for 0 and < 0 values. Therefore we add self.epsilon to avoid endless values.
 		return np.round(-np.mean(y_true * np.log(y_pred + self.epsilon) + (1 - y_true) * np.log(1 - y_pred + self.epsilon)), 4)
