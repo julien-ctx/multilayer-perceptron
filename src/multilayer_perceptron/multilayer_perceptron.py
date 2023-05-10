@@ -15,22 +15,22 @@ from utils import *
 
 class MultilayerPerceptron:
 	def __init__(self, df, algo_type):
+		if algo_type not in algo.__members__:
+			sys.exit(f"{color.RED}Error: wrong algorithm type specified.{color.END}")
 		self.sample = df
 		self.alpha = 0.001
 		self.epochs = 800
-		if algo_type not in algo.__members__:
-			sys.exit(f"{color.RED}Error: wrong algorithm type specified.{color.END}")
+		self.epsilon = 1e-8
 		# Specifying values that will be used with different algorithms.
 		self.algo_type = algo_type
-		if self.algo_type == algo.SGD.value:
+		if self.algo_type in [algo.SGD.value, algo.NAG.value, algo.RMS.value]:
 			self.batch_size = 96
-		elif self.algo_type == algo.NAG.value:
-			self.batch_size = 96
-			# Usual value for beta which is 0.9. It is the momentum rate.
+		if self.algo_type == algo.NAG.value:
+			# Usual value for momentum is 0.9. It is the momentum rate.
 			# It determines the influence of the accumulated momentums on the current update.
-			self.beta = 0.9
-			# Momentum can be seen as velocity.
-			self.momentum = None
+			self.momentum = 0.9
+		if self.algo_type == algo.RMS.value:
+			self.decay_rate = 0.9
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -65,9 +65,8 @@ class MultilayerPerceptron:
 	def get_gradient(self, y_true, y_pred):
 		# https://stats.stackexchange.com/questions/370723/how-to-calculate-the-derivative-of-crossentropy-error-function
 		# Gradient is different from logistic regression because the cross entropy loss function is not the same.
-		# Add epsilon to avoid division by zero
-		epsilon = 1e-8
-		return -y_true / (y_pred + epsilon) + (1 - y_true) / (1 - y_pred + epsilon)
+		# Add self.epsilon to avoid division by zero
+		return -y_true / (y_pred + self.epsilon) + (1 - y_true) / (1 - y_pred + self.epsilon)
 
 	# Activations is an array storing the output of each layer with feedforward.
 	def get_activations(self, training, weights):
@@ -88,42 +87,24 @@ class MultilayerPerceptron:
 			layers_delta.append((layers_delta[i] @ weights[weights_it - i].T) * self.ReLU_derivative(activations[-weights_it - i]))
 		for i in range(weights_it):
 			gradient = (activations[-weights_it - i].T @ layers_delta[i]).to_numpy()
-			weights[weights_it - i] -= self.alpha * gradient
+			if self.algo_type == algo.NAG.value:
+				self.velocity[weights_it - i] = self.momentum * self.velocity[weights_it - i] - self.alpha * gradient
+				weights[weights_it - i] += self.velocity[weights_it - i]
+			elif self.algo_type == algo.RMS.value:
+				self.cache[weights_it - i] = self.decay_rate * self.cache[weights_it - i] + (1 - self.decay_rate) * gradient ** 2
+				weights[weights_it - i] = weights[weights_it - i] - (self.alpha * gradient) / (np.sqrt(self.cache[weights_it - i]) + self.epsilon)
+			else:
+				weights[weights_it - i] -= self.alpha * gradient
 		gradient = (training.T @ layers_delta[-1]).to_numpy()
-		weights[0] -= self.alpha * gradient
+		if self.algo_type == algo.NAG.value:
+			self.velocity[0] = self.momentum * self.velocity[0] - self.alpha * gradient
+			weights[0] += self.velocity[0]
+		elif self.algo_type == algo.RMS.value:
+			self.cache[0] = self.decay_rate * self.cache[0] + (1 - self.decay_rate) * gradient ** 2
+			weights[0] = weights[0] - (self.alpha * gradient) / (np.sqrt(self.cache[0]) + self.epsilon)
+		else:
+			weights[0] -= self.alpha * gradient
 		return weights
-
-	# https://www.youtube.com/watch?v=lglt8BZ6Ld4
-	# def backpropagation(self, y_true, activations, weights, training):
-	# 	# The following output delta formula is the simplified version of self.get_gradient(y_true, activations[-1]) * self.softmax_derivative(activations[-1])
-	# 	layers_delta = [activations[-1] - y_true]
-	# 	weights_it = len(weights) - 1
-
-	# 	# Initialize momentum variable
-	# 	self.momentum = [np.zeros_like(weight) for weight in weights]
-
-	# 	for i in range(weights_it):
-	# 		layers_delta.append((layers_delta[i] @ weights[weights_it - i].T) * self.ReLU_derivative(activations[-weights_it - i]))
-	# 	for i in range(weights_it):
-	# 		# Calculate the gradient update
-	# 		gradient = 
-
-	# 		# Update weights with momentum
-	# 		weights[weights_it - i] -= self.alpha * gradient + self.beta * momentum[weights_it - i]
-
-	# 		# Update momentum
-	# 		momentum[weights_it - i] = self.alpha * gradient + self.beta * momentum[weights_it - i]
-
-	# 	# Calculate the gradient update for the first layer
-	# 	gradient = (training.T @ layers_delta[-1]).to_numpy()
-
-	# 	# Update weights with momentum for the first layer
-	# 	weights[0] -= self.alpha * gradient + self.beta * momentum[0]
-
-	# 	# Update momentum for the first layer
-	# 	momentum[0] = self.alpha * gradient + self.beta * momentum[0]
-
-	# 	return weights
 	
 	def print_loss(self, epoch, training_y_pred, validation_y_pred, training_diag, validation_diag):
 		training_loss = self.loss(training_y_pred, training_diag)
@@ -162,6 +143,10 @@ class MultilayerPerceptron:
 		]
 		self.training_losses = []
 		self.validation_losses = []
+		if self.algo_type == algo.NAG.value:
+			self.velocity = [np.zeros_like(weight) for weight in self.weights]
+		elif self.algo_type == algo.RMS.value:
+			self.cache = [np.zeros_like(weight) for weight in self.weights]
 
 	def get_training_data(self):
 		# Split the data into training and validation sets
@@ -211,8 +196,7 @@ class MultilayerPerceptron:
 			if self.algo_type == algo.GD.value:
 				if self.optimize(training, training_diag, validation, validation_diag, epoch):
 					break
-
-			elif self.algo_type == algo.SGD.value or self.algo_type == algo.NAG.value:
+			elif self.algo_type in [algo.SGD.value, algo.NAG.value, algo.RMS.value]:
 				batch = training.sample(n=self.batch_size)
 				diagnosis = training_diag[batch.index]
 				if self.optimize(batch, diagnosis, validation, validation_diag, epoch):
@@ -222,7 +206,7 @@ class MultilayerPerceptron:
 		np.save('../../assets/weights.npy', self.weights)
 		self.print_plots(self.epochs)
 
-	# Accuracy score, as a percentage, inspired from scikit learn.
+	# Accuracy score, as a percentage, inspired from scikit-learn.
 	def accuracy(self, y_pred, y_true):
 		y_pred = np.where(y_pred == np.max(y_pred, axis=1)[:, np.newaxis], 1.0, y_pred)
 		y_pred = np.where(y_pred == np.min(y_pred, axis=1)[:, np.newaxis], 0.0, y_pred)
@@ -230,9 +214,8 @@ class MultilayerPerceptron:
 		return np.round(correct_predictions * 100 / y_pred.shape[0], 2)
 
 	def loss(self, y_pred, y_true):
-		# Log function is undefined for 0 and < 0 values. Therefore we add epsilon to avoid endless values.
-		epsilon = 1e-8
-		return np.round(-np.mean(y_true * np.log(y_pred + epsilon) + (1 - y_true) * np.log(1 - y_pred + epsilon)), 4)
+		# Log function is undefined for 0 and < 0 values. Therefore we add self.epsilon to avoid endless values.
+		return np.round(-np.mean(y_true * np.log(y_pred + self.epsilon) + (1 - y_true) * np.log(1 - y_pred + self.epsilon)), 4)
 	
 	# Softmax is used by neurons of output layer.
 	def softmax(self, z):

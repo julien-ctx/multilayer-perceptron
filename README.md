@@ -52,4 +52,4 @@ A few more features have been implemented to enhance the model performance, or t
 - Early stopping to avoid overfitting during training.
 - Stochastic Gradient Descent.
 - Nesterov Accelerated Gradient (NAG).
-
+- Root Mean Square Propagation (RMS Prop).

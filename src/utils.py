@@ -19,6 +19,7 @@ class algo(Enum):
     GD = 'GD'
     SGD = 'SGD'
     NAG = 'NAG'
+    RMS = 'RMS'
 
 def get_df(df_name):
 	if not os.path.exists(df_name):
