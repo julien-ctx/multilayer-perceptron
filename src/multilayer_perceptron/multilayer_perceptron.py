@@ -17,12 +17,20 @@ class MultilayerPerceptron:
 	def __init__(self, df, algo_type):
 		self.sample = df
 		self.alpha = 0.001
-		self.epochs = 200
+		self.epochs = 800
 		if algo_type not in algo.__members__:
 			sys.exit(f"{color.RED}Error: wrong algorithm type specified.{color.END}")
+		# Specifying values that will be used with different algorithms.
 		self.algo_type = algo_type
 		if self.algo_type == algo.SGD.value:
 			self.batch_size = 96
+		elif self.algo_type == algo.NAG.value:
+			self.batch_size = 96
+			# Usual value for beta which is 0.9. It is the momentum rate.
+			# It determines the influence of the accumulated momentums on the current update.
+			self.beta = 0.9
+			# Momentum can be seen as velocity.
+			self.momentum = None
 	
 	def drop_irrelevant_data(self):
 		# Thanks to histogram, we can see that Feature 15 (and 12?) has almost the same distribution independently from the type of tumor.
@@ -79,9 +87,43 @@ class MultilayerPerceptron:
 		for i in range(weights_it):
 			layers_delta.append((layers_delta[i] @ weights[weights_it - i].T) * self.ReLU_derivative(activations[-weights_it - i]))
 		for i in range(weights_it):
-			weights[weights_it - i] -= (self.alpha * (activations[-weights_it - i].T @ layers_delta[i])).to_numpy()
-		weights[0] -= (self.alpha * (training.T @ layers_delta[-1])).to_numpy()
+			gradient = (activations[-weights_it - i].T @ layers_delta[i]).to_numpy()
+			weights[weights_it - i] -= self.alpha * gradient
+		gradient = (training.T @ layers_delta[-1]).to_numpy()
+		weights[0] -= self.alpha * gradient
 		return weights
+
+	# https://www.youtube.com/watch?v=lglt8BZ6Ld4
+	# def backpropagation(self, y_true, activations, weights, training):
+	# 	# The following output delta formula is the simplified version of self.get_gradient(y_true, activations[-1]) * self.softmax_derivative(activations[-1])
+	# 	layers_delta = [activations[-1] - y_true]
+	# 	weights_it = len(weights) - 1
+
+	# 	# Initialize momentum variable
+	# 	self.momentum = [np.zeros_like(weight) for weight in weights]
+
+	# 	for i in range(weights_it):
+	# 		layers_delta.append((layers_delta[i] @ weights[weights_it - i].T) * self.ReLU_derivative(activations[-weights_it - i]))
+	# 	for i in range(weights_it):
+	# 		# Calculate the gradient update
+	# 		gradient = 
+
+	# 		# Update weights with momentum
+	# 		weights[weights_it - i] -= self.alpha * gradient + self.beta * momentum[weights_it - i]
+
+	# 		# Update momentum
+	# 		momentum[weights_it - i] = self.alpha * gradient + self.beta * momentum[weights_it - i]
+
+	# 	# Calculate the gradient update for the first layer
+	# 	gradient = (training.T @ layers_delta[-1]).to_numpy()
+
+	# 	# Update weights with momentum for the first layer
+	# 	weights[0] -= self.alpha * gradient + self.beta * momentum[0]
+
+	# 	# Update momentum for the first layer
+	# 	momentum[0] = self.alpha * gradient + self.beta * momentum[0]
+
+	# 	return weights
 	
 	def print_loss(self, epoch, training_y_pred, validation_y_pred, training_diag, validation_diag):
 		training_loss = self.loss(training_y_pred, training_diag)
@@ -139,17 +181,12 @@ class MultilayerPerceptron:
 		return training, validation, training_diag, validation_diag
 
 	def early_stopping(self, epoch):
-		if self.algo_type == algo.GD.value:
-			if len(self.validation_losses) > 1 and self.validation_losses[-2] <= self.validation_losses[-1]:
-				print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
-				self.epochs = epoch
-				return True
-		elif self.algo_type == algo.SGD.value:
-			if len(self.validation_losses) > 1 and self.validation_losses[-2] <= self.validation_losses[-1]:
-				if min(self.training_losses) * 2 >= self.training_losses[-1]:
-					print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
-					self.epochs = epoch
-					return True	
+		if len(self.validation_losses) > 1 and self.validation_losses[-2] <= self.validation_losses[-1]:
+			if self.algo_type == algo.SGD.value and min(self.training_losses) * 2 < self.training_losses[-1]:
+				return False
+			print(f"{color.BLUE}Early stopping at epoch {epoch + 1}/{self.epochs} to avoid overfitting{color.END}")
+			self.epochs = epoch
+			return True
 		return False
 
 	def optimize(self, training, training_diag, validation, validation_diag, epoch):
@@ -175,7 +212,7 @@ class MultilayerPerceptron:
 				if self.optimize(training, training_diag, validation, validation_diag, epoch):
 					break
 
-			elif self.algo_type == algo.SGD.value:
+			elif self.algo_type == algo.SGD.value or self.algo_type == algo.NAG.value:
 				batch = training.sample(n=self.batch_size)
 				diagnosis = training_diag[batch.index]
 				if self.optimize(batch, diagnosis, validation, validation_diag, epoch):
